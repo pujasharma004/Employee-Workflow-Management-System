@@ -30,3 +30,19 @@ class RequestResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str = "employee"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str

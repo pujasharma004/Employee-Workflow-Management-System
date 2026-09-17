@@ -11,6 +11,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=True)
     role = Column(String, default="employee")
 
     requests = relationship("Request", back_populates="user")
@@ -45,3 +46,4 @@ class Request(Base):
     user = relationship("User", back_populates="requests")
     department = relationship("Department", back_populates="requests")
     sla_deadline = Column(DateTime, nullable=True)
+
