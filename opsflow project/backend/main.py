@@ -252,6 +252,8 @@ def update_request(
             detail="Request not found"
         )
 
+    old_status = request.status
+
     if update_data.status is not None:
         request.status = update_data.status
 
@@ -261,13 +263,38 @@ def update_request(
     db.commit()
     db.refresh(request)
 
+    # Send email when request status changes
+    if update_data.status is not None and update_data.status != old_status:
+
+        user = db.query(User).filter(
+            User.id == request.user_id
+        ).first()
+
+        if user:
+            send_email(
+                user.email,
+                "Request Status Updated",
+                f"""
+Hello {user.name},
+
+Your request status has been updated.
+
+Request ID: #{request.id}
+Title: {request.title}
+Previous Status: {old_status}
+New Status: {request.status}
+
+Thank you,
+Employee Workflow Management System
+"""
+            )
+
     return {
         "message": "Request updated successfully",
         "request_id": request.id,
         "status": request.status,
         "priority": request.priority
     }
-
 @app.post("/users")
 def create_user(
     user_data: UserCreate,
