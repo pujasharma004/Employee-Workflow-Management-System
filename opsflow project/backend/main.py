@@ -8,6 +8,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from passlib.context import CryptContext
 from jose import jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from email_service import send_email
 
 
 pwd_context = CryptContext(
@@ -144,6 +145,15 @@ def create_request(
         return {
             "message": "No department found for this category"
         }
+    user = db.query(User).filter(
+        User.id == request_data.user_id
+    ).first()
+
+    if not user:
+        raise HTTPException(
+        status_code=404,
+        detail="User not found"
+        )
 
     if request_data.priority == "High":
         sla_hours = 4
@@ -167,6 +177,24 @@ def create_request(
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
+
+    send_email(
+        user.email,
+        "Request Created Successfully",
+        f"""
+    Hello {user.name},
+
+    Your request has been created successfully.
+
+    Request ID: #{new_request.id}
+    Title: {new_request.title}
+    Priority: {new_request.priority}
+    Status: {new_request.status}
+
+    Thank you,
+    Employee Workflow Management System
+    """
+    )
 
     return {
         "message": "Request created successfully",
