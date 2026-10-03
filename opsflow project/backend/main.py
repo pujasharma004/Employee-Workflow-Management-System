@@ -155,6 +155,34 @@ def create_request(
         detail="User not found"
         )
 
+
+
+        # Find available agents in the requested department
+    available_agents = db.query(User).filter(
+        User.role == "agent",
+        User.department_id == department.id,
+        User.is_available == True
+    ).all()
+
+    if not available_agents:
+        raise HTTPException(
+            status_code=400,
+            detail="No available agent found for this department"
+        )
+
+    # Select agent with the lowest active workload
+    selected_agent = min(
+        available_agents,
+        key=lambda agent: db.query(Request).filter(
+            Request.assigned_agent_id == agent.id,
+            Request.status.in_(["Open", "In Progress"])
+        ).count()
+    )
+
+
+
+
+
     if request_data.priority == "High":
         sla_hours = 4
     elif request_data.priority == "Medium":
@@ -171,13 +199,15 @@ def create_request(
         priority=request_data.priority,
         user_id=request_data.user_id,
         department_id=department.id,
-        sla_deadline=sla_deadline
+        sla_deadline=sla_deadline,
+        assigned_agent_id=selected_agent.id
     )
 
     db.add(new_request)
     db.commit()
     db.refresh(new_request)
-
+    
+    
     send_email(
         user.email,
         "Request Created Successfully",
@@ -190,22 +220,36 @@ def create_request(
     Title: {new_request.title}
     Priority: {new_request.priority}
     Status: {new_request.status}
+    Assigned Agent: {selected_agent.name}
+
+    Your request has been assigned to {selected_agent.name}.
 
     Thank you,
     Employee Workflow Management System
     """
     )
 
-    return {
-        "message": "Request created successfully",
-        "request_id": new_request.id,
-        "title": new_request.title,
-        "status": new_request.status,
-        "department": department.name,
-        "user_id": new_request.user_id,
-        "sla_deadline": new_request.sla_deadline
-    }
+    # Email to assigned agent
+    send_email(
+        selected_agent.email,
+        "New Request Assigned to You",
+        f"""
+    Hello {selected_agent.name},
 
+    A new request has been assigned to you.
+
+    Request ID: #{new_request.id}
+    Title: {new_request.title}
+    Category: {new_request.category}
+    Priority: {new_request.priority}
+    Status: {new_request.status}
+
+    Please review and handle the request.
+
+    Thank you,
+    Employee Workflow Management System
+    """
+    )
 @app.get("/requests", response_model=list[RequestResponse])
 def get_requests(
     db: Session = Depends(get_db),
